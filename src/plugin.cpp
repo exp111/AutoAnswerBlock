@@ -46,6 +46,7 @@ static struct TS3Functions ts3Functions;
 #define PLUGIN_NAME "Auto Answer Block"
 //Global Variables
 static char* pluginID = NULL;
+std::string configFile;
 
 #ifdef _WIN32
 /* Helper function to convert wchar_T to Utf-8 encoded strings on Windows */
@@ -156,7 +157,77 @@ int ts3plugin_requestAutoload() {
 	return 0;
 }
 
+/* Helper function to create a menu item */
+static struct PluginMenuItem* createMenuItem(enum PluginMenuType type, int id, const char* text, const char* icon) {
+	struct PluginMenuItem* menuItem = (struct PluginMenuItem*)malloc(sizeof(struct PluginMenuItem));
+	menuItem->type = type;
+	menuItem->id = id;
+	_strcpy(menuItem->text, PLUGIN_MENU_BUFSZ, text);
+	_strcpy(menuItem->icon, PLUGIN_MENU_BUFSZ, icon);
+	return menuItem;
+}
+
+/* Some makros to make the code to create menu items a bit more readable */
+#define BEGIN_CREATE_MENUS(x) const size_t sz = x + 1; size_t n = 0; *menuItems = (struct PluginMenuItem**)malloc(sizeof(struct PluginMenuItem*) * sz);
+#define CREATE_MENU_ITEM(a, b, c, d) (*menuItems)[n++] = createMenuItem(a, b, c, d);
+#define END_CREATE_MENUS (*menuItems)[n++] = NULL; assert(n == sz);
+
+
+enum {
+	MENU_ID_CLIENT_1 = 1,
+	MENU_ID_MAX
+};
+
+void ts3plugin_initMenus(struct PluginMenuItem*** menuItems, char** menuIcon) {
+
+	BEGIN_CREATE_MENUS(MENU_ID_MAX - 1); //Needs to be correct
+	CREATE_MENU_ITEM(PLUGIN_MENU_TYPE_CLIENT, MENU_ID_CLIENT_1, "Toggle blocker for this client", "");
+	END_CREATE_MENUS;
+
+	*menuIcon = (char*)malloc(PLUGIN_MENU_BUFSZ * sizeof(char));
+	_strcpy(*menuIcon, PLUGIN_MENU_BUFSZ, ""); //PLUGIN MENU IMAGE
+}
+
 /************************** TeamSpeak callbacks ***************************/
+
+void ts3plugin_onMenuItemEvent(uint64 serverConnectionHandlerID, enum PluginMenuType type, int menuItemID, uint64 selectedItemID) {
+	switch (type) {
+	case PLUGIN_MENU_TYPE_CLIENT:
+		/* Channel contextmenu item was triggered. selectedItemID is the ID of the selected client */
+		switch (menuItemID) {
+		case MENU_ID_CLIENT_1:
+		{
+			char* uid = new char[256];
+			if (ts3Functions.getClientVariableAsString(serverConnectionHandlerID, selectedItemID, ClientProperties::CLIENT_UNIQUE_IDENTIFIER, &uid) == ERROR_ok)
+			{
+				std::string id = uid;
+
+				std::string msg;
+
+				auto find = std::find(config->whiteListUIDs.begin(), config->whiteListUIDs.end(), id);
+				if (find != config->whiteListUIDs.end())
+				{
+					config->whiteListUIDs.erase(config->whiteListUIDs.begin() + distance(config->whiteListUIDs.begin(), find));
+					msg = "Removed " + id + " from the whitelist.";
+				}
+				else
+				{
+					config->whiteListUIDs.push_back(id);
+					msg = "Added " + id + " to the whitelist.";
+				}
+				ts3Functions.printMessageToCurrentTab(msg.c_str());
+			}
+			break;
+		}
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 const char* ts3plugin_keyDeviceName(const char* keyIdentifier) {
 	return NULL;
 }
@@ -175,12 +246,13 @@ double GetEpochTimeInMilliseconds()
 	return now;
 }
 
-int checkMessage()
+int checkMessage(const char* identity)
 {
 	double now = GetEpochTimeInMilliseconds();
 	
+	bool isWhitelisted = (std::find(config->whiteListUIDs.begin(), config->whiteListUIDs.end(), std::string(identity)) == config->whiteListUIDs.end());
 	int result = 0;
-	if (config->lastTimestamp != -1) //first message
+	if (config->lastTimestamp != -1 && isWhitelisted) //first message
 	{
 		if (config->lastTimestamp > (now - config->delay)) //too fast
 		{
@@ -196,11 +268,12 @@ int checkMessage()
 
 int ts3plugin_onTextMessageEvent(uint64 serverConnectionHandlerID, anyID targetMode, anyID toID, anyID fromID, const char * fromName, const char * fromUniqueIdentifier, const char * message, int ffIgnored)
 {
-	int result = checkMessage();
+	int result = checkMessage(fromUniqueIdentifier);
 	return result;
 }
 
 int ts3plugin_onClientPokeEvent(uint64 serverConnectionHandlerID, anyID fromClientID, const char* pokerName, const char* pokerUniqueIdentity, const char* message, int ffIgnored)
 {
-	return checkMessage();
+	int result = checkMessage(pokerUniqueIdentity);
+	return result;
 }
