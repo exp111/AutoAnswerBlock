@@ -61,7 +61,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Detection in milliseconds</string>
+    <string>Detection Time in milliseconds</string>
    </property>
   </widget>
  </widget>

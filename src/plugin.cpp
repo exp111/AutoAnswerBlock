@@ -119,8 +119,20 @@ void ts3plugin_shutdown() {
 	}
 }
 
+void openGui(void* qParentWidget = nullptr)
+{
+	QtGui* cfg = new QtGui((QWidget*)qParentWidget);
+	cfg->setAttribute(Qt::WA_DeleteOnClose);
+	cfg->show();
+}
+
 int ts3plugin_offersConfigure() {
-	return PLUGIN_OFFERS_NO_CONFIGURE;
+	return PLUGIN_OFFERS_CONFIGURE_QT_THREAD;
+}
+
+void ts3plugin_configure(void* handle, void* qParentWidget)
+{
+	openGui(qParentWidget);
 }
 
 void ts3plugin_registerPluginID(const char* id) {
@@ -144,64 +156,7 @@ int ts3plugin_requestAutoload() {
 	return 0;
 }
 
-//Helper Functions
-
-void openGui(void* qParentWidget = nullptr)
-{
-	QtGui* cfg = new QtGui((QWidget*)qParentWidget);
-	cfg->setAttribute(Qt::WA_DeleteOnClose);
-	cfg->show();
-}
-
-/* Helper function to create a menu item */
-static struct PluginMenuItem* createMenuItem(enum PluginMenuType type, int id, const char* text, const char* icon) {
-	struct PluginMenuItem* menuItem = (struct PluginMenuItem*)malloc(sizeof(struct PluginMenuItem));
-	menuItem->type = type;
-	menuItem->id = id;
-	_strcpy(menuItem->text, PLUGIN_MENU_BUFSZ, text);
-	_strcpy(menuItem->icon, PLUGIN_MENU_BUFSZ, icon);
-	return menuItem;
-}
-
-/* Some makros to make the code to create menu items a bit more readable */
-#define BEGIN_CREATE_MENUS(x) const size_t sz = x + 1; size_t n = 0; *menuItems = (struct PluginMenuItem**)malloc(sizeof(struct PluginMenuItem*) * sz);
-#define CREATE_MENU_ITEM(a, b, c, d) (*menuItems)[n++] = createMenuItem(a, b, c, d);
-#define END_CREATE_MENUS (*menuItems)[n++] = NULL; assert(n == sz);
-
-
-enum {
-	MENU_ID_GLOBAL_1 = 1,
-	MENU_ID_MAX
-};
-
-void ts3plugin_initMenus(struct PluginMenuItem*** menuItems, char** menuIcon) {
-
-	BEGIN_CREATE_MENUS(MENU_ID_MAX - 1); //Needs to be correct
-	CREATE_MENU_ITEM(PLUGIN_MENU_TYPE_GLOBAL, MENU_ID_GLOBAL_1, "Open GUI", "");
-	END_CREATE_MENUS;
-
-	*menuIcon = (char*)malloc(PLUGIN_MENU_BUFSZ * sizeof(char));
-	_strcpy(*menuIcon, PLUGIN_MENU_BUFSZ, ""); //PLUGIN MENU IMAGE
-}
-
 /************************** TeamSpeak callbacks ***************************/
-void ts3plugin_onMenuItemEvent(uint64 serverConnectionHandlerID, enum PluginMenuType type, int menuItemID, uint64 selectedItemID) {
-	switch (type) {
-	case PLUGIN_MENU_TYPE_GLOBAL:
-		/* Channel contextmenu item was triggered. selectedItemID is the channelID of the selected channel */
-		switch (menuItemID) {
-		case MENU_ID_GLOBAL_1:
-			openGui();
-			break;
-		default:
-			break;
-		}
-		break;
-	default:
-		break;
-	}
-}
-
 const char* ts3plugin_keyDeviceName(const char* keyIdentifier) {
 	return NULL;
 }

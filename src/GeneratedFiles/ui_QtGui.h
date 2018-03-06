@@ -59,7 +59,7 @@ public:
     void retranslateUi(QWidget *QtGui)
     {
         QtGui->setWindowTitle(QApplication::translate("QtGui", "Auto Answer Blocker", Q_NULLPTR));
-        infoLabel->setText(QApplication::translate("QtGui", "Detection in milliseconds", Q_NULLPTR));
+        infoLabel->setText(QApplication::translate("QtGui", "Detection Time in milliseconds", Q_NULLPTR));
     } // retranslateUi
 
 };
